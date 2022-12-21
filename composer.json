@@ -1,0 +1,21 @@
+{
+    "name": "university-of-copenhagen/ku-page-wizard",
+    "type": "typo3-cms-extension",
+    "description": "Create pages with using a wizard",
+    "homepage": "https://www.ku.dk/",
+    "license": ["GPL-2.0-or-later"],
+    "keywords": ["TYPO3 CMS"],
+    "require": {
+        
+    },
+    "autoload": {
+        "psr-4": {
+            "UniversityOfCopenhagen\\KuPageWizard\\": "Classes/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "ku_page_wizard"
+        }
+    }
+}

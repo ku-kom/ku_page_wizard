@@ -1,0 +1,18 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" xmlns:be="http://typo3.org/ns/TYPO3/CMS/Backend/ViewHelpers" xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers" data-namespace-typo3-fluid="true">
+<div class="module-pagewizard">
+    <f:spaceless>
+        <div class="page-types">
+            <div class="row">
+                <div class="card" style="width: 18rem;">
+                    <div class="card-body">
+                      <h5 class="card-title">Card title</h5>
+                      <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p>
+                      <a href='{be:moduleLink(route:"record_edit", arguments:{edit: edit, defVals:{pages:{tx_kupagewizard_page_template: "default"}}, columnsOnly: "title,tx_kupagewizard_page_template"})}' class="btn btn-primary">Vælg</a>
+                    </div>
+                  </div>
+            </div>
+        </div>
+    </f:spaceless>
+</div>
+
+</html>
