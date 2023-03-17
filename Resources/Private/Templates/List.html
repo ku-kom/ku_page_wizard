@@ -1,0 +1,29 @@
+<html
+		xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+		xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+		data-namespace-typo3-fluid="true"
+>
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+
+	<f:be.pageRenderer
+			includeJavaScriptModules="{
+            0: '@typo3/backend/context-menu.js',
+            1: '@typo3/backend/modal.js'
+        }"
+	/>
+
+	<h1>Page models</h1>
+
+	<div class="row">
+		<f:for each="{models}" as="model">
+			<f:render partial="PageList" arguments="{model: model, id: id}" />
+		</f:for>
+	</div>
+
+
+</f:section>
+
+</html>

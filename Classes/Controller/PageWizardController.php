@@ -7,6 +7,13 @@ namespace UniversityOfCopenhagen\KuPageWizard\Controller;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
+use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Domain\Repository\PageRepository;
+use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Imaging\Icon;
 use Psr\Http\Message\ResponseInterface;
@@ -20,6 +27,8 @@ final class PageWizardController
 {
     protected ModuleTemplateFactory $moduleTemplateFactory;
     protected IconFactory $iconFactory;
+
+    protected StandaloneView $view;
 
     public function __construct(
         ModuleTemplateFactory $moduleTemplateFactory = null,
@@ -37,60 +46,92 @@ final class PageWizardController
         }
 
         $action = (string)($request->getQueryParams()['action'] ?? $request->getParsedBody()['action'] ?? 'index');
-        $id = (int) $request->getQueryParams()['id'];
 
         /**
          * Define allowed actions
          */
-        if (!in_array($action, ['index'], true)) {
+        if (!in_array($action, ['index', 'copy'], true)) {
             return new HtmlResponse('Action not allowed', 400);
         }
-
         /**
          * Configure template paths for your backend module
          */
+        /*
         $this->view = GeneralUtility::makeInstance(StandaloneView::class);
         $this->view->setTemplateRootPaths(['EXT:ku_page_wizard/Resources/Private/Templates/']);
         $this->view->setPartialRootPaths(['EXT:ku_page_wizard/Resources/Private/Partials/']);
         $this->view->setLayoutRootPaths(['EXT:ku_page_wizard/Resources/Private/Layouts/']);
         $this->view->setTemplate($action);
-        $this->view->assign('pageid', $id);
-        $this->view->assign('edit', ['pages' => [$id => 'new']]);
+        $this->view->assign('id', $id);
+        */
 
         /**
          * Call the passed in action
          */
-        $result = $this->{$action . 'Action'}($request);
+        return $this->{$action . 'Action'}($request);
 
-        if ($result instanceof ResponseInterface) {
-            return $result;
-        }
-
-        /**
-         * Render template and return html content
-         */
-        $this->moduleTemplate->setContent($this->view->render());
-        return new HtmlResponse($this->moduleTemplate->renderContent());
     }
 
     public function indexAction(ServerRequestInterface $request): ResponseInterface
     {
+        /** @var PageRepository $pageRepository */
+        $models = $this->getModelPages();
         $moduleTemplate = $this->moduleTemplateFactory->create($request);
  
         $buttonBar = $moduleTemplate->getDocHeaderComponent()->getButtonBar();
 
-        $shortCutButton = $buttonBar->makeShortcutButton()->setRouteIdentifier('web_txkupagewizard');
+        /*
+        $shortCutButton = $buttonBar->makeShortcutButton()->setRouteIdentifier('web_page_wizard');
         $buttonBar->addButton($shortCutButton, ButtonBar::BUTTON_POSITION_RIGHT, 1);
+        */
 
-        $link = GeneralUtility::makeInstance(UriBuilder::class)->buildUriFromRoute('web_txkupagewizard');
+        $link = GeneralUtility::makeInstance(UriBuilder::class)->buildUriFromRoute('web_page_wizard');
         $reloadButton = $buttonBar->makeLinkButton()
             ->setHref($link)
             ->setTitle($this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.reload'))
             ->setIcon($this->iconFactory->getIcon('actions-refresh', Icon::SIZE_SMALL));
         $buttonBar->addButton($reloadButton, ButtonBar::BUTTON_POSITION_RIGHT, 1);
 
-        $moduleTemplate->setContent($this->view->render());
-        return new HtmlResponse($moduleTemplate->renderContent());
+
+        $view = $this->moduleTemplateFactory->create($request);
+        $view->assignMultiple([
+            'models' => $models,
+            'id' => (int) $request->getQueryParams()['id']
+        ]);
+        return $view->renderResponse('List');
+    }
+
+    public function copyAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $parameters = $request->getQueryParams();
+        $source = (int) $parameters['source'];
+        $destination = (int) $parameters['destination'];
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start(
+            [],
+            [
+                'pages' => [
+                    $source => [
+                        'copy' => [
+                            'aciton' => 'paste',
+                            'target' => $destination,
+                            'update' => [
+                                'hidden' => 1
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        );
+        $dataHandler->process_cmdmap();
+        BackendUtility::setUpdateSignal('updatePageTree');
+
+        $uid = $dataHandler->copyMappingArray_merged['pages'][$source];
+
+        return new RedirectResponse(
+            GeneralUtility::makeInstance(UriBuilder::class)->buildUriFromRoute('web_layout', ['id' => $uid])
+        );
     }
 
     /**
@@ -99,5 +140,27 @@ final class PageWizardController
     protected function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
+    }
+
+    protected function getModelPages(): array
+    {
+        /** @var ConnectionPool $pool */
+        $connection = GeneralUtility::makeInstance(ConnectionPool::class);
+        /** @var \TYPO3\CMS\Core\Database\Query\QueryBuilder $queryBuilder */
+        $queryBuilder = $connection->getQueryBuilderForTable('pages');
+        $queryBuilder->getRestrictions()->removeByType(HiddenRestriction::class);
+
+        $modelsPid = (int) GeneralUtility::makeInstance(ExtensionConfiguration::class)->get('ku_page_wizard', 'modelsPid');
+
+            return $queryBuilder->select('uid', 'title', 'rowDescription AS description')
+                ->from('pages')
+                ->where(
+                    $queryBuilder->expr()->in(
+                        'pid',
+                        $modelsPid
+                    )
+                )
+                ->executeQuery()
+                ->fetchAllAssociative();
     }
 }
